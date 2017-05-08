@@ -1,12 +1,16 @@
 # Udacity Self-Driving Car Engineer Nanodegree
 ## Kidnapped Vehicle Project
+
 ---
+
 This repo contains my solution to the Kidnapped Vehicle Project for Udacity's Self-Driving Car Engineer Nanodegree Program.
 
 The original repo can be found at [https://github.com/udacity/CarND-Kidnapped-Vehicle-Project](https://github.com/udacity/CarND-Kidnapped-Vehicle-Project).
 
 The description below comes from the original repo.
+
 ---
+
 ## Overview
 This repository contains all the code needed to complete the final project for the Localization course in Udacity's Self-Driving Car Nanodegree.
 
