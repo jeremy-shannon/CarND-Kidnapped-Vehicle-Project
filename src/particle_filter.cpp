@@ -23,7 +23,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
   // NOTE: Consult particle_filter.h for more information about this method (and others in this file).
   cout << "PF:init start" << endl; 
 
-  num_particles = 100;
+  num_particles = 10;
 
   // seed noise generation
   default_random_engine gen;
@@ -76,8 +76,8 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
       p.y += velocity * delta_t * sin(p.theta);
     } 
     else {
-      p.x +=     velocity / yaw_rate * (sin(p.theta + yaw_rate*delta_t) - sin(p.theta));
-      p.y +=     velocity / yaw_rate * (cos(p.theta) - cos(p.theta + yaw_rate*delta_t));
+      p.x     += velocity / yaw_rate * (sin(p.theta + yaw_rate*delta_t) - sin(p.theta));
+      p.y     += velocity / yaw_rate * (cos(p.theta) - cos(p.theta + yaw_rate*delta_t));
       p.theta += yaw_rate * delta_t;
     }
 
@@ -98,7 +98,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
   //   implement this method and use it as a helper during the updateWeights phase.
   cout << "PF:dataAssociation start" << endl;
 
-  for (int i = 0; i < observations.size(); i++) {
+  for (unsigned int i = 0; i < observations.size(); i++) {
     
     // grab current observation
     LandmarkObs o = observations[i];
@@ -109,7 +109,7 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
     // init id of landmark from map placeholder to be associated with the observation
     int map_id = -1;
     
-    for (int j = 0; j < predicted.size(); j++) {
+    for (unsigned int j = 0; j < predicted.size(); j++) {
 
       // grab current prediction
       LandmarkObs p = predicted[j];
@@ -150,6 +150,48 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   //   for the fact that the map's y-axis actually points downwards.)
   //   http://planning.cs.uiuc.edu/node99.html
   cout << "PF:updateWeights start" << endl;
+
+  // for each particle...
+  for (unsigned int i = 0; i < particles.size(); i++) {
+
+    // get the particle x, y coordinates
+    double p_x = particles[i].x;
+    double p_y = particles[i].y;
+    double p_theta = particles[i].theta;
+
+    // create a vector to hold the predicted map landmark locations from the particle's viewpoint
+    vector<LandmarkObs> predictions;
+
+    // for each map landmark...
+    for (unsigned int j = 0; j < map_landmarks.landmark_list.size(); j++) {
+
+      // get x,y coordinates
+      float lm_x = map_landmarks.landmark_list[j].x_f;
+      float lm_y = map_landmarks.landmark_list[j].y_f;
+      int lm_id = map_landmarks.landmark_list[j].id_i;
+      
+      // only consider landmarks within sensor range of the particle (rather than using the "dist" method considering a circular 
+      // region around the particle, this considers a rectangular region but is computationally faster)
+      if (fabs(lm_x - p_x) <= sensor_range && fabs(lm_y - p_y) <= sensor_range) {
+
+        LandmarkObs prediction;
+
+        // transform the landmark location to what the particle would observe
+        // rotation and translation:
+        prediction.x = lm_x * cos(-p_theta) - lm_y * sin(-p_theta) - p_x;
+        prediction.y = lm_x * sin(-p_theta) + lm_y * cos(-p_theta) - p_y;
+        prediction.id = lm_id;
+
+        // add prediction to vector
+        predictions.push_back(prediction);
+
+      }
+
+    }
+
+    // perform dataAssociation for the predictions
+    dataAssociation(predictions, observations);
+  }
 
 
 
