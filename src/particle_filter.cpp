@@ -110,7 +110,6 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
     int map_id = -1;
     
     for (unsigned int j = 0; j < predicted.size(); j++) {
-
       // grab current prediction
       LandmarkObs p = predicted[j];
 
@@ -119,21 +118,16 @@ void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::ve
 
       // find the predicted landmark nearest the current observed landmark
       if (cur_dist < min_dist) {
-
         min_dist = cur_dist;
         map_id = p.id;
-
       }
-
     }
 
     // set the observation's id to the nearest predicted landmark's id
     o.id = map_id;
-
   }
   
   cout << "PF:dataAssociation end" << endl;
-
 }
 
 void ParticleFilter::updateWeights(double sensor_range, double std_landmark[], 
@@ -152,7 +146,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
   cout << "PF:updateWeights start" << endl;
 
   // for each particle...
-  for (unsigned int i = 0; i < particles.size(); i++) {
+  for (int i = 0; i < num_particles; i++) {
 
     // get the particle x, y coordinates
     double p_x = particles[i].x;
@@ -173,7 +167,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
       // only consider landmarks within sensor range of the particle (rather than using the "dist" method considering a circular 
       // region around the particle, this considers a rectangular region but is computationally faster)
       if (fabs(lm_x - p_x) <= sensor_range && fabs(lm_y - p_y) <= sensor_range) {
-
         LandmarkObs prediction;
 
         // transform the landmark location to what the particle would observe
@@ -184,16 +177,40 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
         // add prediction to vector
         predictions.push_back(prediction);
-
       }
-
     }
 
     // perform dataAssociation for the predictions
     dataAssociation(predictions, observations);
+
+    // reinit weight
+    particles[i].weight = 1.0;
+
+    for (unsigned int j = 0; j < observations.size(); j++) {
+      
+      // placeholders for observation and associated prediction coordinates
+      double o_x, o_y, pr_x, pr_y;
+      o_x = observations[j].x;
+      o_y = observations[j].y;
+
+      int associated_prediction = observations[j].id;
+
+      for (unsigned int k = 0; k < predictions.size(); k++) {
+        if (predictions[k].id == associated_prediction) {
+          pr_x = predictions[k].x;
+          pr_y = predictions[k].y;
+        }
+      }
+
+      // calculate weight for this observation with multivariate Gaussian
+      double s_x = std_landmark[0];
+      double s_y = std_landmark[1];
+      double obs_w = (1 / (2 * M_PI*s_x*s_y)) * exp(-(pow(pr_x - o_x, 2) / (2 * pow(s_x, 2)) + (pow(pr_y - o_y, 2) / (2 * pow(s_y, 2)))));
+
+      // product of this obersvation weight with total observations weight
+      particles[i].weight *= obs_w;
+    }
   }
-
-
 
   cout << "PF:updateWeights end" << endl;
 }
@@ -203,9 +220,40 @@ void ParticleFilter::resample() {
   // NOTE: You may find std::discrete_distribution helpful here.
   //   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
   cout << "PF:resample start" << endl;
+  
+  vector<Particle> new_particles;
 
+  // get all of the current weights
+  vector<double> weights;
+  for (int i = 0; i < num_particles; i++) {
+    weights.push_back(particles[i].weight);
+  }
 
+  // generate random starting index for resampling wheel
+  std::random_device rd;   
+  std::mt19937 rng(rd());  
+  std::uniform_int_distribution<int> uni(0, num_particles);
+  auto index = uni(rng);
 
+  // get max weight
+  double max_weight = *max_element(weights.begin(), weights.end());
+
+  // uniform random distribution [0.0, max_weight)
+  uniform_real_distribution<double> unid(0.0, max_weight);
+
+  double beta = 0.0;
+
+  // spin the resample wheel!
+  for (int i = 0; i < num_particles; i++) {
+    beta += unid(rng) * 2.0;
+    while (beta > weights[index]) {
+      beta -= weights[index];
+      index = (index + 1) % num_particles;
+    }
+    new_particles.push_back(particles[index]);
+  }
+
+  particles = new_particles;
   cout << "PF:resample end" << endl;
 }
 
