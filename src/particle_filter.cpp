@@ -15,6 +15,8 @@
 
 using namespace std;
 
+// declare a random engine to be used across multiple and various method calls
+static default_random_engine gen;
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
   // TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
@@ -22,14 +24,14 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
   // Add random Gaussian noise to each particle.
   // NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
-  num_particles = 6;
+  num_particles = 101;
 
-  // seed noise generation
-  default_random_engine gen;
+  // define normal distributions for sensor noise
   normal_distribution<double> N_x_init(0, std[0]);
   normal_distribution<double> N_y_init(0, std[1]);
   normal_distribution<double> N_theta_init(0, std[2]);
 
+  // init particles
   for (int i = 0; i < num_particles; i++) {
     Particle p;
     p.id = i;
@@ -55,8 +57,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
   //  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
   //  http://www.cplusplus.com/reference/random/default_random_engine/
 
-  // seed noise generation
-  default_random_engine gen;
+  // define normal distributions for sensor noise
   normal_distribution<double> N_x(0, std_pos[0]);
   normal_distribution<double> N_y(0, std_pos[1]);
   normal_distribution<double> N_theta(0, std_pos[2]);
@@ -78,7 +79,6 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
     particles[i].x += N_x(gen);
     particles[i].y += N_y(gen);
     particles[i].theta += N_theta(gen);
-
   }
 }
 
@@ -216,22 +216,20 @@ void ParticleFilter::resample() {
   }
 
   // generate random starting index for resampling wheel
-  std::random_device rd;   
-  std::mt19937 rng(rd());  
-  std::uniform_int_distribution<int> uni(0, num_particles-1);
-  auto index = uni(rng);
+  uniform_int_distribution<int> uniintdist(0, num_particles-1);
+  auto index = uniintdist(gen);
 
   // get max weight
   double max_weight = *max_element(weights.begin(), weights.end());
 
   // uniform random distribution [0.0, max_weight)
-  uniform_real_distribution<double> unid(0.0, max_weight);
+  uniform_real_distribution<double> unirealdist(0.0, max_weight);
 
   double beta = 0.0;
 
   // spin the resample wheel!
   for (int i = 0; i < num_particles; i++) {
-    beta += unid(rng) * 2.0;
+    beta += unirealdist(gen) * 2.0;
     while (beta > weights[index]) {
       beta -= weights[index];
       index = (index + 1) % num_particles;
